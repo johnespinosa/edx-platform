@@ -45,9 +45,7 @@ class DashboardPage(PageObject):
         Return list of the names of available courses (e.g. "999 edX Demonstration Course")
         """
         def _get_course_name(el):
-            # The first component in the link text is the course number
-            course_name = el.text
-            return course_name
+            return el.text
 
         return self.q(css='h3.course-title > a').map(_get_course_name).results
 
@@ -113,7 +111,7 @@ class DashboardPage(PageObject):
             el = course_listing[0]
 
             # Expand the upsell copy and click the upgrade button
-            el.find_element_by_css_selector('.message-upsell').click()
+            el.find_element_by_css_selector('.message-upsell .ui-toggle-expansion').click()
             el.find_element_by_css_selector('#upgrade-to-verified').click()
 
             upgrade_page.wait_for_page()
@@ -176,4 +174,4 @@ class DashboardPage(PageObject):
         """
         Verify if pre-requisite course messages are being displayed.
         """
-        return self.q(css='section.prerequisites > .tip').visible
+        return self.q(css='li.prerequisites > .tip').visible
