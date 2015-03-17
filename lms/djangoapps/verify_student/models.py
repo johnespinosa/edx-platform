@@ -38,6 +38,7 @@ from reverification.models import MidcourseReverificationWindow
 from xmodule_django.models import CourseKeyField
 log = logging.getLogger(__name__)
 
+from config_models.models import ConfigurationModel
 
 def generateUUID():  # pylint: disable=invalid-name
     """ Utility function; generates UUIDs """
@@ -641,6 +642,12 @@ class SoftwareSecurePhotoVerification(PhotoVerification):
         query = cls.objects.filter(user=user, window=None).order_by('-updated_at')
         return query[0]
 
+    @classmethod
+    def get_initial_verification(cls, user):
+        init_verification = cls.objects.filter(user=user, status__in=["submitted", "approved"], window=None).\
+            order_by("-created_at")[0:1]
+        return init_verification[0] if init_verification else None
+
     @status_before_must_be("created")
     def upload_face_image(self, img_data):
         """
@@ -976,3 +983,17 @@ class VerificationStatus(models.Model):
         """
         for checkpoint in checkpoints:
             cls.objects.create(checkpoint=checkpoint, user=user, status=status)
+
+
+class InCourseReverificationConfiguration(ConfigurationModel):
+    """Configure incourse re-verification.
+
+    Enable or disable incourse re-verification feature.
+    When this flag is disabled, the "incourse re-verification" feature
+    will be disabled.
+
+    When the flag is enabled, the "incourse re-verification" feature
+    will be enabled.
+
+    """
+    pass

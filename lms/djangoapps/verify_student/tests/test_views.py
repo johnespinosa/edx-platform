@@ -17,6 +17,7 @@ from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
 from django.core import mail
+from django.test.utils import override_settings
 from bs4 import BeautifulSoup
 
 from openedx.core.djangoapps.user_api.accounts.api import get_account_settings
@@ -33,8 +34,14 @@ from course_modes.models import CourseMode
 from shoppingcart.models import Order, CertificateItem
 from embargo.test_utils import restrict_course
 from util.testing import UrlResetMixin
-from verify_student.views import render_to_response, PayAndVerifyView
-from verify_student.models import SoftwareSecurePhotoVerification
+from verify_student.views import (
+    render_to_response, PayAndVerifyView ,EVENT_NAME_USER_ENTERED_INCOURSE_REVERIFY_VIEW,
+    EVENT_NAME_USER_SUBMITTED_INCOURSE_REVERIFY
+)
+from verify_student.models import (
+    SoftwareSecurePhotoVerification, VerificationCheckpoint,
+    InCourseReverificationConfiguration
+)
 from reverification.tests.factories import MidcourseReverificationWindowFactory
 
 
@@ -1640,3 +1647,182 @@ class TestReverificationBanner(ModuleStoreTestCase):
         self.client.post(reverse('verify_student_toggle_failed_banner_off'))
         photo_verification = SoftwareSecurePhotoVerification.objects.get(user=self.user, window=self.window)
         self.assertFalse(photo_verification.display)
+
+
+class TestInCourseReverifyView(ModuleStoreTestCase):
+    """
+    Tests for the incourse reverification views.
+    """
+    IMAGE_DATA = "abcd,1234"
+    def setUp(self):
+        super(TestInCourseReverifyView, self).setUp()
+
+        self.user = UserFactory.create(username="rusty", password="test")
+        self.client.login(username="rusty", password="test")
+
+        self.course_key = SlashSeparatedCourseKey("Robot", "999", "Test_Course")
+        CourseFactory.create(org='Robot', number='999', display_name='Test Course')
+
+        # Create the course modes
+        for mode in ('audit', 'honor', 'verified'):
+            min_price = 0 if mode in ["honor", "audit"] else 1
+            CourseModeFactory(mode_slug=mode, course_id=self.course_key, min_price=min_price)
+
+        # Enroll the user in the default mode (honor) to emulate
+        CourseEnrollment.enroll(self.user, self.course_key, mode="verified")
+        self.config = InCourseReverificationConfiguration(enabled=True)
+        self.config.save()
+
+        # mocking and patching for bi events
+        analytics_patcher = patch('verify_student.views.analytics')
+        self.mock_tracker = analytics_patcher.start()
+        self.addCleanup(analytics_patcher.stop)
+
+    @patch.dict(settings.FEATURES, {'AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING': True})
+    def test_incourse_reverify_feature_flag_get(self):
+        self.config.enabled = False
+        self.config.save()
+        url = reverse('verify_student_incourse_reverify',
+                      kwargs={"course_id": unicode(self.course_key), "checkpoint_name": "midterm"})
+        response = self.client.get(url)
+
+        self.assertEquals(response.status_code, 404)
+
+    @patch.dict(settings.FEATURES, {'AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING': True})
+    def test_incourse_reverify_invalid_course_get(self):
+        url = reverse('verify_student_incourse_reverify',
+                      kwargs={"course_id": "invalid/course/key", "checkpoint_name": "midterm"})
+        response = self.client.get(url)
+
+        self.assertEquals(response.status_code, 404)
+
+    @patch.dict(settings.FEATURES, {'AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING': True})
+    def test_incourse_reverify_invalid_checkpoint_get(self):
+        url = reverse('verify_student_incourse_reverify',
+                      kwargs={"course_id": unicode(self.course_key), "checkpoint_name": "invalid_checkpoint"})
+        response = self.client.get(url)
+
+        self.assertEquals(response.status_code, 404)
+
+    @patch.dict(settings.FEATURES, {'AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING': True})
+    def test_incourse_reverify_initial_redirect_get(self):
+        self._create_checkpoint()
+        url = reverse('verify_student_incourse_reverify',
+                      kwargs={"course_id": unicode(self.course_key), "checkpoint_name": "midterm"})
+        response = self.client.get(url)
+        url = reverse('verify_student_verify_later',
+                      kwargs={"course_id": unicode(self.course_key)})
+        self.assertRedirects(response, url)
+
+    @override_settings(SEGMENT_IO_LMS_KEY="foobar")
+    @patch.dict(settings.FEATURES, {'AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING': True, 'SEGMENT_IO_LMS': True})
+    def test_incourse_reverify_get(self):
+        self._create_checkpoint()
+        self._create_initial_verification()
+        url = reverse('verify_student_incourse_reverify',
+                      kwargs={"course_id": unicode(self.course_key), "checkpoint_name": "midterm"})
+        response = self.client.get(url)
+        self.assertEquals(response.status_code, 200)
+
+        #Verify Google Analytics event fired after successfully submiting the picture
+        self.mock_tracker.track.assert_called_once_with(  # pylint: disable=no-member
+            self.user.id,  # pylint: disable=no-member
+            EVENT_NAME_USER_ENTERED_INCOURSE_REVERIFY_VIEW,
+            {
+                'category': "verification",
+                'label': unicode(self.course_key),
+                'checkpoint': "midterm"
+            },
+
+            context={
+                'Google Analytics':
+                {'clientId': None}
+            }
+        )
+        self.mock_tracker.reset_mock()
+
+
+
+    @patch.dict(settings.FEATURES, {'AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING': True})
+    @patch('verify_student.views.render_to_response', render_mock)
+    def test_invalid_checkpoint_post(self):
+        url = reverse('verify_student_incourse_reverify',
+                      kwargs={"course_id": unicode(self.course_key), "checkpoint_name": "midterm"})
+        response = self.client.post(url)
+        self.assertEquals(response.status_code, 200)
+        ((template, context), _kwargs) = render_mock.call_args  # pylint: disable=unpacking-non-sequence
+        self.assertIn('incourse_reverify', template)
+        self.assertTrue(context['error'])
+
+    @patch.dict(settings.FEATURES, {'AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING': True})
+    def test_incourse_reverify_initial_redirect_post(self):
+        self._create_checkpoint()
+        url = reverse('verify_student_incourse_reverify',
+                      kwargs={"course_id": unicode(self.course_key), "checkpoint_name": "midterm"})
+        response = self.client.post(url)
+        url = reverse('verify_student_verify_later',
+                      kwargs={"course_id": unicode(self.course_key)})
+
+        self.assertRedirects(response, url)
+
+    @patch.dict(settings.FEATURES, {'AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING': True})
+    def test_incourse_reverify_index_error_post(self):
+        self._create_checkpoint()
+        self._create_initial_verification()
+        url = reverse('verify_student_incourse_reverify',
+                      kwargs={
+                          "course_id": unicode(self.course_key),
+                          "checkpoint_name": "midterm"})
+        response = self.client.post(url, {"face_image": ""})
+        self.assertEqual(response.status_code, 400)
+
+    @override_settings(SEGMENT_IO_LMS_KEY="foobar")
+    @patch.dict(settings.FEATURES, {'AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING': True, 'SEGMENT_IO_LMS': True})
+    def test_incourse_reverify_post(self):
+        self._create_checkpoint()
+        self._create_initial_verification()
+        url = reverse('verify_student_incourse_reverify',
+                      kwargs={
+                          "course_id": unicode(self.course_key),
+                          "checkpoint_name": "midterm"})
+        response = self.client.post(url, {"face_image": self.IMAGE_DATA})
+        self.assertEqual(response.status_code, 200)
+
+        #Verify Google Analytics event fired after successfully submiting the picture
+        self.mock_tracker.track.assert_called_once_with(  # pylint: disable=no-member
+            self.user.id,  # pylint: disable=no-member
+            EVENT_NAME_USER_SUBMITTED_INCOURSE_REVERIFY,
+            {
+                'category': "verification",
+                'label': unicode(self.course_key),
+                'checkpoint': "midterm"
+            },
+
+            context={
+                'Google Analytics':
+                {'clientId': None}
+            }
+        )
+        self.mock_tracker.reset_mock()
+
+    @patch.dict(settings.FEATURES, {'AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING': True})
+    def test_incourse_reverify_feature_flag_post(self):
+        self.config.enabled = False
+        self.config.save()
+        url = reverse('verify_student_incourse_reverify',
+                      kwargs={"course_id": unicode(self.course_key), "checkpoint_name": "midterm"})
+        response = self.client.post(url)
+
+        self.assertEquals(response.status_code, 404)
+        # self.config.enabled = True
+        # self.config.save()
+
+    def _create_checkpoint(self):
+        checkpoint = VerificationCheckpoint(course_id=self.course_key, checkpoint_name="midterm")
+        checkpoint.save()
+
+    def _create_initial_verification(self):
+        attempt = SoftwareSecurePhotoVerification(user=self.user)
+        attempt.mark_ready()
+        attempt.save()
+        attempt.submit()
