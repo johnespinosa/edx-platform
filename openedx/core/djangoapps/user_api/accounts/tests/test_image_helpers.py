@@ -34,7 +34,7 @@ class ProfileImageUrlTestCase(TestCase):
         """
         self.assertEqual(
             actual_url,
-            'http://example-storage.com/profile_images/{0}_{1}.jpg'.format(expected_name, expected_pixels),
+            'http://example-storage.com/profile-images/{0}_{1}.jpg'.format(expected_name, expected_pixels),
         )
 
     def verify_urls(self, expected_name, actual_urls):
