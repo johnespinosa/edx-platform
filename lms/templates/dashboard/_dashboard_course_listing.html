@@ -46,18 +46,24 @@ from student.helpers import (
   <section class="details">
       % if show_courseware_link:
         % if not is_course_blocked:
-          <a href="${course_target}" class="cover">
-            <img src="${course_image_url(course)}" alt="${_('{course_number} {course_name} Home Page').format(course_number=course.number, course_name=course.display_name_with_default) |h}" />
-          </a>
+          <div class="wrapper-course-image">
+            <a href="${course_target}" class="cover">
+              <img src="${course_image_url(course)}" class="course-image" alt="${_('{course_number} {course_name} Home Page').format(course_number=course.number, course_name=course.display_name_with_default) |h}" />
+            </a>
+          </div>
         % else:
-          <a class="fade-cover">
-            <img src="${course_image_url(course)}" alt="${_('{course_number} {course_name} Cover Image').format(course_number=course.number, course_name=course.display_name_with_default) |h}" />
-          </a>
-          % endif
+          <div class="wrapper-course-image">
+            <a class="fade-cover">
+              <img src="${course_image_url(course)}" class="course-image" alt="${_('{course_number} {course_name} Cover Image').format(course_number=course.number, course_name=course.display_name_with_default) |h}" />
+            </a>
+          </div>
+        % endif
       % else:
-        <div class="cover">
-          <img src="${course_image_url(course)}" alt="${_('{course_number} {course_name} Cover Image').format(course_number=course.number, course_name=course.display_name_with_default) | h}" />
-        </div>
+      <div class="wrapper-course-image">
+        <a class="cover">
+          <img src="${course_image_url(course)}" class="course-image" alt="${_('{course_number} {course_name} Cover Image').format(course_number=course.number, course_name=course.display_name_with_default) | h}" />
+        </a>
+      </div>
       % endif
       % if settings.FEATURES.get('ENABLE_VERIFIED_CERTIFICATES'):
         <span class="sts-enrollment" title="${course_verified_certs.get('enrollment_title')}">
