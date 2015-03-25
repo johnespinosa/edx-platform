@@ -431,8 +431,8 @@
 
             .actions-dropdown-list {
               @extend %ui-no-list;
-              display: table;
               @include box-sizing(border-box);
+              display: table;
               box-shadow: 0 1px 1px $shadow-l1;
               position: relative;
               width: 100%;
