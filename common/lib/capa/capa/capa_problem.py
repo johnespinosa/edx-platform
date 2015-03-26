@@ -141,6 +141,7 @@ class LoncapaProblem(object):
         self.capa_system = capa_system
         self.question_label = ""
         self.duplicate_question = ""
+        self.custom_added_responders = ['customresponse', 'imageresponse', 'formularesponse', 'jsmeresponse']
 
         state = state or {}
 
@@ -734,7 +735,8 @@ class LoncapaProblem(object):
                 'status': status,
                 'id': input_id,
                 'input_state': self.input_state[input_id],
-                'question_label': self.question_label if self.question_label != self.duplicate_question else "",
+                'question_label': self.question_label,
+                'duplicate_question': self.duplicate_question,
                 'answervariable': answervariable,
                 'feedback': {
                     'message': msg,
@@ -773,11 +775,21 @@ class LoncapaProblem(object):
                 if item_child is not None and item_child in self.responders:
                     self.question_label = item_xhtml.text
                     item_xhtml.text = ""
-                if item_sibling is None or item_sibling not in self.responders or item_xhtml.tag != 'p':
-                    # don't add item if it is question paragraph, will be added through label
+                    item_xhtml.attrib['id'] = "question_" + str(self.responders.get(item_child).id)
                     tree.append(item_xhtml)
+                elif item_sibling is not None and item_sibling in self.responders and item_xhtml.tag == "p":
+                    if any(responder in self.custom_added_responders for responder in self.responders.get(item_sibling).tags):
+                        if "formularesponse" in self.responders.get(item_sibling).tags:
+                            item_xhtml.tag = "label"
+                            item_xhtml.attrib['id'] = "question_" + str(self.responders.get(item_sibling).id)
+                            item_xhtml.attrib['for'] = "input_" + str(self.responders.get(item_sibling).answer_id)
+                            tree.append(item_xhtml)
+                        else:
+                            tree.append(item_xhtml)
+                    else:
+                        self.question_label = item_xhtml.text
                 else:
-                    self.question_label = item_xhtml.text
+                    tree.append(item_xhtml)
 
         if tree.tag in html_transforms:
             tree.tag = html_transforms[problemtree.tag]['tag']

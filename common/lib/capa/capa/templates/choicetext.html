@@ -15,7 +15,8 @@
     % endif
     </div>
 
-    <fieldset aria-label="${label}">
+    <fieldset>
+        <legend>${question_label}</legend>
         % for choice_id, choice_description in choices:
         <%choice_id= choice_id %>
         <section id="forinput${choice_id}"
