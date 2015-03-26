@@ -2,7 +2,8 @@
 EdX Platform Course Structure API Module
 ########################################
 
-This page contains information on using the Platform Course Structure API to:
+This page contains information on using the Platform Course Structure API to
+complete these actions:
 
 * :ref:`Get a list of courses in the edX platform <Get a List of Courses>`
 
@@ -26,8 +27,8 @@ Get a List of Courses
 
     {
         "count": 809, 
-        "next": "https://courses.stage.edx.org/api/course_structure/v0/courses/?page=3", 
-        "previous": "https://courses.stage.edx.org/api/course_structure/v0/courses/?page=1",  
+        "next": "https://courses.edx.org/api/course_structure/v0/courses/?page=3", 
+        "previous": "https://courses.edx.org/api/course_structure/v0/courses/?page=1",  
         "num_pages": 81, 
         "results": [
             {
@@ -37,7 +38,7 @@ Get a List of Courses
                 "org": "ANUx", 
                 "run": "1T2014", 
                 "course": "ANU-ASTRO1x", 
-                "uri": "https://courses.stage.edx.org/api/course_structure/v0/courses/ANUx/ANU-ASTRO1x/1T2014/", 
+                "uri": "https://courses.edx.org/api/course_structure/v0/courses/ANUx/ANU-ASTRO1x/1T2014/", 
                 "image_url": "/c4x/ANUx/ANU-ASTRO1x/asset/dome_dashboard.jpg", 
                 "start": "2014-03-24T18:30:00Z", 
                 "end": null
@@ -49,7 +50,7 @@ Get a List of Courses
                 "org": "ANUx", 
                 "run": "1T2015", 
                 "course": "ANU-ASTRO4x", 
-                "uri": "https://courses.stage.edx.org/api/course_structure/v0/courses/ANUx/ANU-ASTRO4x/1T2015/", 
+                "uri": "https://courses.edx.org/api/course_structure/v0/courses/ANUx/ANU-ASTRO4x/1T2015/", 
                 "image_url": "/c4x/ANUx/ANU-ASTRO4x/asset/ASTRO4x_dashboard_image.jpeg", 
                 "start": "2015-02-03T00:00:00Z", 
                 "end": "2015-04-28T23:30:00Z"
@@ -81,7 +82,7 @@ Get Course Details
         "org": "ANUx", 
         "run": "1T2014", 
         "course": "ANU-INDIA1x", 
-        "uri": "https://courses.stage.edx.org/api/course_structure/v0/courses/ANUx/ANU-INDIA1x/1T2014/", 
+        "uri": "https://courses.edx.org/api/course_structure/v0/courses/ANUx/ANU-INDIA1x/1T2014/", 
         "image_url": "/c4x/ANUx/ANU-INDIA1x/asset/homepage_course_image.jpg", 
         "start": "2014-04-29T01:00:00Z", 
         "end": "2014-07-21T01:00:00Z"
@@ -119,7 +120,6 @@ Get the Course Structure
               \u0939\u092e\u0928\u0947 \u0915\u094d\u092f\u093e 
               \u0938\u0940\u0916\u093e - \u092d\u093e\u0917 6 ",  
             "graded": true,  
-            "graded": false, 
             "format": null, 
             "children": []
         }, 

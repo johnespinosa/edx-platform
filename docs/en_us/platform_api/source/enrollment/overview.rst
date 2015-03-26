@@ -8,8 +8,7 @@ Use the edX Platform Enrollment API to view user and course enrollment
 information, and to enroll a user in a course.
 
 The edX Platform Enrollment API uses Representational State Transfer (REST)
-design principles and supports the JavaScript Object Notation (JSON) data-
-interchange format. The REST API is simple, lightweight, and optimized.
+design principles and supports the JavaScript Object Notation (JSON) data-interchange format. The REST API is simple, lightweight, and optimized.
 
 You can use the edX Platform Enrollment API for web, desktop, and mobile
 applications.
@@ -25,7 +24,7 @@ significant enhancements to this API.
 EdX Platform Enrollment API Capabilities
 ********************************************
 
-With the edX Platform Enrollment API, you can:
+With the edX Platform Enrollment API, you can complete these tasks.
 
 * :ref:`Get the user's enrollment status in a course <Get the Users Enrollment
   Status in a Course>`

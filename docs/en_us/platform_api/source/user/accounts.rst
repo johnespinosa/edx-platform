@@ -2,7 +2,8 @@
 EdX Platform User Accounts API Module
 ##################################################
 
-This page contains information on using the edX Platform User Accounts API to:
+This page contains information on using the edX Platform User Accounts API to
+complete these actions:
 
 * `Get and Update the User's Account Information`_
 

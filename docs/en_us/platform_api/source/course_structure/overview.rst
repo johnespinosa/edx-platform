@@ -9,7 +9,7 @@ blocks in the course and the course grading policy.
 
 The edX Platform Course Structure API uses Representational State Transfer
 (REST) design principles and supports the JavaScript Object Notation (JSON)
-data- interchange format. The REST API is simple, lightweight, and optimized.
+data-interchange format. The REST API is simple and lightweight.
 
 You can use the edX Platform Course Structure API for web, desktop, and mobile
 applications.
@@ -25,7 +25,7 @@ making significant enhancements to this API.
 EdX Platform Course Structure API Capabilities
 ***********************************************
 
-With the edX Platform Course Structure API, you can:
+With the edX Platform Course Structure API, you can complete these tasks.
 
 * :ref:`Get a list of courses in the edX platform <Get a List of Courses>`
 
@@ -33,4 +33,4 @@ With the edX Platform Course Structure API, you can:
 
 * :ref:`Get a course's structure, or blocks <Get the Course Structure>`
 
-* :ref:`Get a courses grading policy <Get the Course Grading Policy>`
+* :ref:`Get a course's grading policy <Get the Course Grading Policy>`

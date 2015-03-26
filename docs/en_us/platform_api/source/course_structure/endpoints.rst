@@ -4,7 +4,8 @@
 EdX Platform Course Structure API Endpoints
 ################################################
 
-Use the edX Platform Course Structure API to view information about courses.
+You use the edX Platform Course Structure API to view information about
+courses.
 
 The following tasks and endpoints are currently supported. 
 

@@ -3,7 +3,7 @@ EdX Platform Mobile Course Information API Module
 ##################################################
 
 This page describes how to use the edX Platform Mobile Course Information API
-to:
+to complete these actions:
 
 * `Get Course Updates`_
 * `Get Course Handouts`_

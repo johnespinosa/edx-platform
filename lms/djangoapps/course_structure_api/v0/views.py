@@ -100,7 +100,7 @@ class CourseList(CourseViewMixin, ListAPIView):
         * num_pages: The number of pages listing courses.
 
         * results:  A list of courses returned. Each collection in the list
-          contains the following fields:
+          contains these fields.
 
             * id: The unique identifier for the course.
 
@@ -170,13 +170,13 @@ class CourseDetail(CourseViewMixin, RetrieveAPIView):
 
         * category: The type of content.
 
-        * org: The organization specified for the course.
+        * org: The organization that is offering the course.
 
         * run: The run of the course.
 
         * course: The course number.
 
-        * uri: The URI to use to get details of the course.
+        * uri: The URI to use to get details about the course.
 
         * image_url: The URI for the course's main image.
 
@@ -209,7 +209,7 @@ class CourseStructure(CourseViewMixin, RetrieveAPIView):
 
         * blocks: A dictionary that maps block IDs to a collection of
           information about each block. Each block contains the following
-          fields:
+          fields.
 
           * id: The ID of the block.
 
@@ -219,10 +219,10 @@ class CourseStructure(CourseViewMixin, RetrieveAPIView):
 
           * display_name: The display name configured for the block.
 
-          * graded: Whether or not the sequential or problem is graded. true or
-            false.
+          * graded: Whether or not the sequential or problem is graded. The
+            value is true or false.
 
-          * format: ??
+          * format: The assignment type.
 
           * children: If the block has child blocks, a list of IDs of the child
             blocks.
@@ -258,7 +258,7 @@ class CourseGradingPolicy(CourseViewMixin, ListAPIView):
     **Response Values**
 
         * assignment_type: The type of the assignment, as configured by course
-          staff. For example, course staff might make assignment types Homework,
+          staff. For example, course staff might make the assignment types Homework,
           Quiz, and Exam.
 
         * count: The number of assignments of the type.

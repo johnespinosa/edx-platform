@@ -2,7 +2,8 @@
 EdX Platform Mobile Video Outlines API Module
 ##################################################
 
-This page describes how to use the edX Platform Mobile Video Outlines API to:
+This page describes how to use the edX Platform Mobile Video Outlines API to
+complete these actions:
 
 * `Get the Video List`_
 * `Get a Video Transcript`_

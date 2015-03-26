@@ -2,8 +2,8 @@
 EdX Platform User API Endpoints
 ################################################
 
-Use the edX Platform User API to view information about users and update your
-own account.
+You use the edX Platform User API to view information about users and update
+your own account.
 
 The following tasks and endpoints are currently supported. 
 

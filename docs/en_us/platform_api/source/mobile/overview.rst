@@ -27,7 +27,7 @@ release. We plan on making significant enhancements and changes to the API.
 EdX Platform Mobile API Capabilities
 *************************************
 
-With the edX Platform Mobile API, you can:
+With the edX Platform Mobile API, you can complete these tasks.
 
 * Get :ref:`user details<Get User Details>` and :ref:`course enrollments<Get a
   User's Course Enrollments>` for a user.
