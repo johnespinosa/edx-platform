@@ -6,20 +6,25 @@
  */
  var edx = edx || {};
 
-(function( $, _, Backbone, gettext ) {
+ (function( $, _, _s, Backbone, gettext ) {
     'use strict';
 
     edx.verify_student = edx.verify_student || {};
 
     edx.verify_student.InCourseReverifyView = Backbone.View.extend({
+
         el: '#incourse-reverify-container',
         templateId: '#incourse_reverify-tpl',
         submitButtonId: '#submit',
 
         initialize: function( obj ) {
+            _.mixin( _s.exports() );
+
             this.errorModel = obj.errorModel || null;
             this.courseKey = obj.courseKey || null;
             this.checkpointName = obj.checkpointName || null;
+            this.platformName = obj.platformName || null;
+
 
             this.model = new edx.verify_student.ReverificationModel({
                 courseKey: this.courseKey,
@@ -35,7 +40,8 @@
                 $( this.templateId ).html(),
                 {
                     courseKey: this.courseKey,
-                    checkpointName: this.checkpointName
+                    checkpointName: this.checkpointName,
+                    platformName: this.platformName
                 }
             );
             $( this.el ).html( renderedTemplate );
@@ -94,4 +100,4 @@
                 .attr('aria-disabled', !isEnabled);
         }
     });
-})( jQuery, _, Backbone, gettext );
+})(jQuery, _, _.str, Backbone, gettext);

@@ -1099,6 +1099,7 @@ class InCourseReverifyView(View):
             'course_key': unicode(course_key),
             "course_name": course.display_name_with_default,
             'checkpoint_name': checkpoint_name,
+            'platform_name': settings.PLATFORM_NAME,
         }
         return render_to_response("verify_student/incourse_reverify.html", context)
 
@@ -1132,7 +1133,8 @@ class InCourseReverifyView(View):
                 "course_name": course.display_name_with_default,
                 'checkpoint_name': checkpoint_name,
                 "error": True,
-                "errorMsg": "No checkpoint found"
+                "errorMsg": "No checkpoint found",
+                'platform_name': settings.PLATFORM_NAME,
             }
             return render_to_response("verify_student/incourse_reverify.html", context)
         init_verification = SoftwareSecurePhotoVerification.get_initial_verification(user)
