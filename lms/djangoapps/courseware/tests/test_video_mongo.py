@@ -519,19 +519,11 @@ class TestGetHtmlMethod(BaseTestXmodule):
     def test_get_html_with_existing_edx_video_id(self):
         # create test profiles and their encodings
         encoded_videos = []
-        for profile, extension in [("desktop_webm", "webm"), ("desktop_mp4", "mp4")]:
-            result = create_profile(
-                dict(
-                    profile_name=profile,
-                    extension=extension,
-                    width=200,
-                    height=2001
-                )
-            )
-            self.assertEqual(result, profile)
+        for profile in ["desktop_webm", "desktop_mp4"]:
+            create_profile(profile)
             encoded_videos.append(
                 dict(
-                    url=u"http://fake-video.edx.org/thundercats.{}".format(extension),
+                    url=u"http://fake-video.edx.org/thundercats_{profile}".format(profile),
                     file_size=9000,
                     bitrate=42,
                     profile=profile,

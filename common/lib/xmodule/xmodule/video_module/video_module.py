@@ -315,10 +315,13 @@ class VideoDescriptor(VideoFields, VideoTranscriptsMixin, VideoStudioViewHandler
         c) If `source` exists and `source` in `html5_sources`, do not show `source`
             field. `download_video` field has value True.
         """
+        self._val_data = kwargs.pop('val_data', None)
         super(VideoDescriptor, self).__init__(*args, **kwargs)
         # For backwards compatibility -- if we've got XML data, parse it out and set the metadata fields
         if self.data:
-            field_data = self._parse_video_xml(etree.fromstring(self.data))
+            # VAL data is intentionally ignored here because it is unnecessary
+            # for backwards compatibility purposes here
+            field_data, _val_data = self._parse_video_xml(etree.fromstring(self.data))
             self._field_data.set_many(self, field_data)
             del self.data
 
@@ -370,6 +373,24 @@ class VideoDescriptor(VideoFields, VideoTranscriptsMixin, VideoStudioViewHandler
                 generate_translation=True
             )
 
+    def save(self):
+        # If video is not yet present in VAL, add it. If video is already
+        # present, we intentionally do not update it because it could be used by
+        # another course, and we don't want to clobber another course's data.
+        # Eventually, we would like to augment the VAL API to allow us to add
+        # new video encodings to an existing video.
+        if self._val_data and edxval_api:
+            try:
+                edxval_api.get_video_info(self._val_data['edx_video_id'])
+                log.info(
+                    "edx_video_id %s present in module %s not imported because it exists in VAL",
+                    self._val_data['edx_video_id'],
+                    self.location.course_id
+                )
+            except edxval_api.ValVideoNotFoundError:
+                edxval_api.create_video(self._val_data)
+        super(VideoDescriptor, self).save()
+
     def save_with_metadata(self, user):
         """
         Save module with updated metadata to database."
@@ -404,8 +425,7 @@ class VideoDescriptor(VideoFields, VideoTranscriptsMixin, VideoStudioViewHandler
         xml_data: A string of xml that will be translated into data and children for
             this module
         system: A DescriptorSystem for interacting with external resources
-        org and course are optional strings that will be used in the generated modules
-            url identifiers
+        id_generator is used to generate course-specific urls and identifiers
         """
         xml_object = etree.fromstring(xml_data)
         url_name = xml_object.get('url_name', xml_object.get('slug'))
@@ -416,7 +436,9 @@ class VideoDescriptor(VideoFields, VideoTranscriptsMixin, VideoStudioViewHandler
             filepath = cls._format_filepath(xml_object.tag, name_to_pathname(url_name))
             xml_object = cls.load_file(filepath, system.resources_fs, usage_id)
             system.parse_asides(xml_object, definition_id, usage_id, id_generator)
-        field_data = cls._parse_video_xml(xml_object)
+        field_data, val_data = cls._parse_video_xml(xml_object)
+        if val_data:
+            val_data['courses'] = [id_generator.course_id]
         kvs = InheritanceKeyValueStore(initial_values=field_data)
         field_data = KvsFieldData(kvs)
         video = system.construct_xblock_from_class(
@@ -426,6 +448,7 @@ class VideoDescriptor(VideoFields, VideoTranscriptsMixin, VideoStudioViewHandler
             # so we use the location for both
             ScopeIds(None, block_type, definition_id, usage_id),
             field_data,
+            val_data=val_data,
         )
         return video
 
@@ -477,6 +500,29 @@ class VideoDescriptor(VideoFields, VideoTranscriptsMixin, VideoStudioViewHandler
             ele.set('language', transcript_language)
             ele.set('src', self.transcripts[transcript_language])
             xml.append(ele)
+
+        if self.edx_video_id and edxval_api:
+            try:
+                val_info = edxval_api.get_video_info(self.edx_video_id)
+                ele = etree.Element(
+                    'video_asset_data',
+                    attrib={
+                        'client_video_id': val_info['client_video_id'],
+                        'duration': unicode(val_info['duration']),
+                    }
+                )
+                for encoded_video in val_info['encoded_videos']:
+                    etree.SubElement(
+                        ele,
+                        'encoded_video',
+                        attrib={
+                            key: unicode(encoded_video[key])
+                            for key in ['url', 'file_size', 'bitrate', 'profile']
+                        }
+                    )
+                xml.append(ele)
+            except edxval_api.ValVideoNotFoundError:
+                pass
 
         return xml
 
@@ -621,7 +667,26 @@ class VideoDescriptor(VideoFields, VideoTranscriptsMixin, VideoStudioViewHandler
         if 'download_track' not in field_data and track is not None:
             field_data['download_track'] = True
 
-        return field_data
+        video_asset_elem = xml.find('video_asset_data')
+        val_data = None
+        if 'edx_video_id' in field_data and video_asset_elem is not None:
+            val_data = {
+                'edx_video_id': field_data['edx_video_id'],
+                'client_video_id': video_asset_elem.get('client_video_id'),
+                'duration': video_asset_elem.get('duration'),
+                'status': 'imported',
+                'encoded_videos': [
+                    {
+                        'url': encoded_video.get('url'),
+                        'file_size': int(encoded_video.get('file_size')),
+                        'bitrate': int(encoded_video.get('bitrate')),
+                        'profile': encoded_video.get('profile'),
+                    }
+                    for encoded_video in video_asset_elem.findall('encoded_video')
+                ]
+            }
+
+        return (field_data, val_data)
 
     def index_dictionary(self):
         xblock_body = super(VideoDescriptor, self).index_dictionary()

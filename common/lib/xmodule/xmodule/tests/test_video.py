@@ -15,20 +15,23 @@ the course, section, subsection, unit, etc.
 import unittest
 import datetime
 from uuid import uuid4
+
+from lxml import etree
 from mock import Mock, patch
 
-from . import LogicTest
-from lxml import etree
+from django.conf import settings
+
+from edxval.api import create_video, create_profile, get_video_info, ValCannotCreateError
+import edxval.models as edxval_models
 from opaque_keys.edx.locations import SlashSeparatedCourseKey
-from xmodule.video_module import VideoDescriptor, create_youtube_string, get_video_from_cdn
-from .test_import import DummySystem
 from xblock.field_data import DictFieldData
 from xblock.fields import ScopeIds
 
 from xmodule.tests import get_test_descriptor_system
+from xmodule.video_module import VideoDescriptor, create_youtube_string, get_video_from_cdn
 from xmodule.video_module.transcripts_utils import download_youtube_subs, save_to_store
-
-from django.conf import settings
+from . import LogicTest
+from .test_import import DummySystem
 
 SRT_FILEDATA = '''
 0
@@ -87,6 +90,16 @@ def instantiate_descriptor(**field_data):
         scope_ids=ScopeIds(None, None, usage_key, usage_key),
         field_data=DictFieldData(field_data),
     )
+
+
+def _reset_val_data():
+    """
+    Remove all data from VAL
+
+    This is a necessary cleanup step because these are not django TestCases
+    """
+    edxval_models.Video.objects.all().delete()
+    edxval_models.Profile.objects.all().delete()
 
 
 class VideoModuleTest(LogicTest):
@@ -522,6 +535,106 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
             'data': ''
         })
 
+    def test_import_val_data(self):
+        # setup
+        module_system = DummySystem(load_error_modules=True)
+        for profile in ['mobile_low', 'mobile_high']:
+            create_profile(profile)
+        self.addCleanup(_reset_val_data)
+        id_generator = Mock()
+        id_generator.course_id = 'test_course_id'
+
+        # import new edx_video_id
+        xml_data = """
+            <video edx_video_id="test_edx_video_id">
+                <video_asset_data client_video_id="test_client_video_id" duration="128.0">
+                    <encoded_video bitrate="100" file_size="1600" profile="mobile_low" url="profile1_url"/>
+                    <encoded_video bitrate="1000" file_size="16000" profile="mobile_high" url="profile2_url"/>
+                </video_asset_data>
+            </video>
+        """
+        video = VideoDescriptor.from_xml(xml_data, module_system, id_generator)
+        video.save()
+
+        self.assert_attributes_equal(video, {'edx_video_id': 'test_edx_video_id'})
+        val_video_info = get_video_info('test_edx_video_id')
+        self.assertEqual(val_video_info['edx_video_id'], 'test_edx_video_id')
+        self.assertEqual(val_video_info['client_video_id'], 'test_client_video_id')
+        self.assertEqual(val_video_info['duration'], 128.0)
+        self.assertEqual(val_video_info['status'], 'imported')
+        self.assertEqual(len(val_video_info['encoded_videos']), 2)
+        val_video_info['encoded_videos'].sort(
+            key=(lambda encoded_video: encoded_video['url'])
+        )
+        self.assertEqual(val_video_info['encoded_videos'][0]['url'], 'profile1_url')
+        self.assertEqual(val_video_info['encoded_videos'][0]['file_size'], 1600)
+        self.assertEqual(val_video_info['encoded_videos'][0]['bitrate'], 100)
+        self.assertEqual(val_video_info['encoded_videos'][0]['profile'], 'mobile_low')
+        self.assertEqual(val_video_info['encoded_videos'][1]['url'], 'profile2_url')
+        self.assertEqual(val_video_info['encoded_videos'][1]['file_size'], 16000)
+        self.assertEqual(val_video_info['encoded_videos'][1]['bitrate'], 1000)
+        self.assertEqual(val_video_info['encoded_videos'][1]['profile'], 'mobile_high')
+
+    def test_import_val_data_conflict(self):
+        module_system = DummySystem(load_error_modules=True)
+        id_generator = Mock()
+        id_generator.course_id = 'test_course_id'
+        for profile in ['original_profile', 'new_profile']:
+            create_profile(profile)
+        create_video(
+            {
+                'edx_video_id': 'test_edx_video_id',
+                'client_video_id': 'original_client_video_id',
+                'duration': 1111,
+                'status': 'original_status',
+                'encoded_videos': [
+                    {
+                        'profile': 'original_profile',
+                        'url': 'original_url',
+                        'file_size': 2222,
+                        'bitrate': 3333,
+                    },
+                ],
+            },
+        )
+        self.addCleanup(_reset_val_data)
+
+        xml_data = """
+            <video edx_video_id="test_edx_video_id">
+                <video_asset_data client_video_id="new_client_video_id" duration="4444.0">
+                    <encoded_video bitrate="5555" file_size="6666" profile="new_profile" url="new_url"/>
+                </video_asset_data>
+            </video>
+        """
+        video = VideoDescriptor.from_xml(xml_data, module_system, id_generator)
+        video.save()
+
+        val_video_info = get_video_info('test_edx_video_id')
+        self.assertEqual(val_video_info['client_video_id'], 'original_client_video_id')
+        self.assertEqual(val_video_info['duration'], 1111)
+        self.assertEqual(val_video_info['status'], 'original_status')
+        self.assertEqual(len(val_video_info['encoded_videos']), 1)
+        self.assertEqual(val_video_info['encoded_videos'][0]['url'], 'original_url')
+        self.assertEqual(val_video_info['encoded_videos'][0]['file_size'], 2222)
+        self.assertEqual(val_video_info['encoded_videos'][0]['bitrate'], 3333)
+        self.assertEqual(val_video_info['encoded_videos'][0]['profile'], 'original_profile')
+
+    def test_import_val_data_invalid(self):
+        module_system = DummySystem(load_error_modules=True)
+        id_generator = Mock()
+        id_generator.course_id = 'test_course_id'
+        create_profile('test_profile')
+        self.addCleanup(_reset_val_data)
+
+        xml_data = """
+            <video edx_video_id="test_edx_video_id">
+                <video_asset_data client_video_id="test_client_video_id" duration="-1"/>
+            </video>
+        """
+        video = VideoDescriptor.from_xml(xml_data, module_system, id_generator)
+        with self.assertRaises(ValCannotCreateError):
+            video.save()
+
 
 class VideoExportTestCase(VideoDescriptorTestBase):
     """
@@ -550,6 +663,31 @@ class VideoExportTestCase(VideoDescriptorTestBase):
         self.descriptor.html5_sources = ['http://www.example.com/source.mp4', 'http://www.example.com/source.ogg']
         self.descriptor.download_video = True
         self.descriptor.transcripts = {'ua': 'ukrainian_translation.srt', 'ge': 'german_translation.srt'}
+        for profile in ["mobile_low", "mobile_high"]:
+            create_profile(profile)
+        self.descriptor.edx_video_id = create_video(
+            {
+                "edx_video_id": "test_edx_video_id",
+                "client_video_id": "test_client_video_id",
+                "duration": 128.0,
+                "status": "dummy_status",
+                "encoded_videos": [
+                    {
+                        "profile": "mobile_low",
+                        "url": "profile1_url",
+                        "file_size": 1600,
+                        "bitrate": 100,
+                    },
+                    {
+                        "profile": "mobile_high",
+                        "url": "profile2_url",
+                        "file_size": 16000,
+                        "bitrate": 1000,
+                    },
+                ],
+            },
+        )
+        self.addCleanup(_reset_val_data)
 
         xml = self.descriptor.definition_to_xml(None)  # We don't use the `resource_fs` parameter
         parser = etree.XMLParser(remove_blank_text=True)
@@ -561,10 +699,16 @@ class VideoExportTestCase(VideoDescriptorTestBase):
            <handout src="http://www.example.com/handout"/>
            <transcript language="ge" src="german_translation.srt" />
            <transcript language="ua" src="ukrainian_translation.srt" />
+           <video_asset_data client_video_id="test_client_video_id" duration="128.0">
+             <encoded_video bitrate="100" file_size="1600" profile="mobile_low" url="profile1_url"/>
+             <encoded_video bitrate="1000" file_size="16000" profile="mobile_high" url="profile2_url"/>
+           </video_asset_data>
          </video>
         '''
         expected = etree.XML(xml_string, parser=parser)
         self.assertXmlEqual(expected, xml)
+
+        _reset_val_data()
 
     def test_export_to_xml_empty_end_time(self):
         """
