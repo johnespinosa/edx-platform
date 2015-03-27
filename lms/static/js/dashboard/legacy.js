@@ -106,8 +106,6 @@
             var dropdown = $(dropdown_selector);
             dropdown.toggleClass('is-visible');
 
-            // add BI event here
-
         }
 
         $("#failed-verification-button-dismiss").click(function() {

@@ -42,7 +42,7 @@ from student.helpers import (
   % endif
 
 <article class="course${mode_class}">
-  <% course_target = reverse('info', args=[course.id.to_deprecated_string()]) %>
+  <% course_target = reverse('info', args=[unicode(course.id)]) %>
   <section class="details">
     <div class="wrapper-course-image">
       % if show_courseware_link:
@@ -101,30 +101,21 @@ from student.helpers import (
           <div class="wrapper-course-actions">
             <div class="course-actions">
               % if course.has_ended():
-               % if not is_course_blocked:
-                <a href="${course_target}" class="enter-course archived">${_('View Archived Course')}</a>
+                % if not is_course_blocked:
+                  <a href="${course_target}" class="enter-course archived">${_('View Archived Course')}</a>
+                % else:
+                  <a class="enter-course-blocked archived">${_('View Archived Course')}</a>
+                % endif
               % else:
-                <a class="enter-course-blocked archived">${_('View Archived Course')}</a>
+                % if not is_course_blocked:
+                  <a href="${course_target}" class="enter-course">${_('View Course')}</a>
+                % else:
+                  <a class="enter-course-blocked">${_('View Course')}</a>
+                % endif
               % endif
-              % else:
-              % if not is_course_blocked:
-                <a href="${course_target}" class="enter-course">${_('View Course')}</a>
-              % else:
-                <a class="enter-course-blocked">${_('View Course')}</a>
-              % endif
-              % endif
-
-              <!-- <a href="#" data-tooltip="${_('Share on Facebook')}" class="action action-facebook" aria-haspopup="true" aria-expanded="false">
-                <span class="sr">Facebook</span>
-                <i class="fa fa-facebook" aria-hidden="true"></i>
-              </a> -->
-              <!-- <a href="#" data-tooltip="${_('Share on Twitter')}" class="action action-twitter" aria-haspopup="true" aria-expanded="false">
-                <span class="sr">Twitter</span>
-                <i class="fa fa-twitter" aria-hidden="true"></i>
-              </a> -->
               <div class="wrapper-action-more">
                 <a href="#actions-dropdown-${dashboard_index}" class="action action-more" id="actions-dropdown-link-${dashboard_index}" aria-haspopup="true" aria-expanded="false" data-course-number="${course.number | h}" data-dashboard-index="${dashboard_index}">
-                  <span class="sr">Course options dropdown</span>
+                  <span class="sr">${_('Course options dropdown')}</span>
                   <i class="fa fa-cog" aria-hidden="true"></i>
                 </a>
                 <div class="actions-dropdown" id="actions-dropdown-${dashboard_index}">
