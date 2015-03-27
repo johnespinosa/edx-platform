@@ -13,7 +13,7 @@ from xmodule.modulestore import EdxJSONEncoder
 
 import dogstats_wrapper as dog_stats_api
 
-from lxml.etree import (
+from lxml.etree import ( # pylint: disable=no-name-in-module
     Element, ElementTree, XMLParser,
 )
 
@@ -184,7 +184,7 @@ class XmlParserMixin(object):
 
         Returns an lxml Element
         """
-        return etree.parse(file_object, parser=EDX_XML_PARSER).getroot()
+        return etree.parse(file_object, parser=EDX_XML_PARSER).getroot()  # pylint: disable=no-member
 
     @classmethod
     def load_file(cls, filepath, fs, def_id):  # pylint: disable=invalid-name
@@ -474,7 +474,7 @@ class XmlParserMixin(object):
         return non_editable_fields
 
 
-class XmlDescriptor(XmlParserMixin, XModuleDescriptor):
+class XmlDescriptor(XmlDescriptor, XmlParserMixin):  # pylint: disable=abstract-method
     """
     Mixin class for standardized parsing of XModule xml.
     """
@@ -499,7 +499,7 @@ class XmlDescriptor(XmlParserMixin, XModuleDescriptor):
         #    a) define from_xml themselves
         #    b) call super(..).from_xml(..)
         return super(XmlDescriptor, cls).parse_xml(
-            etree.fromstring(xml_data),
+            etree.fromstring(xml_data),  # pylint: disable=no-member
             system,
             None,  # This is ignored by XmlParserMixin
             id_generator,
@@ -536,7 +536,7 @@ class XmlDescriptor(XmlParserMixin, XModuleDescriptor):
         #    b) call super(..).export_to_xml(..)
         node = Element(self.category)
         super(XmlDescriptor, self).add_xml_to_node(node)
-        return etree.tostring(node)
+        return etree.tostring(node)  # pylint: disable=no-member
 
     def add_xml_to_node(self, node):
         """
