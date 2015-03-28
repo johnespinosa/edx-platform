@@ -1294,9 +1294,9 @@ DROP TABLE IF EXISTS `edxval_profile`;
 CREATE TABLE `edxval_profile` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `profile_name` varchar(50) NOT NULL,
-  `extension` varchar(10) NOT NULL,
-  `width` int(10) unsigned NOT NULL,
-  `height` int(10) unsigned NOT NULL,
+  `extension` varchar(10) DEFAULT 'mp4',
+  `width` int(10) unsigned DEFAULT 1,
+  `height` int(10) unsigned DEFAULT 1,
   PRIMARY KEY (`id`),
   UNIQUE KEY `profile_name` (`profile_name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8;

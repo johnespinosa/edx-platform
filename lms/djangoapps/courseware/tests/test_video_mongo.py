@@ -523,7 +523,7 @@ class TestGetHtmlMethod(BaseTestXmodule):
             create_profile(profile)
             encoded_videos.append(
                 dict(
-                    url=u"http://fake-video.edx.org/thundercats_{profile}".format(profile),
+                    url=u"http://fake-video.edx.org/thundercats_{profile}".format(profile=profile),
                     file_size=9000,
                     bitrate=42,
                     profile=profile,

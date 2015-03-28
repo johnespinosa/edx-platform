@@ -21,8 +21,6 @@ from mock import Mock, patch
 
 from django.conf import settings
 
-from edxval.api import create_video, create_profile, get_video_info, ValCannotCreateError
-import edxval.models as edxval_models
 from opaque_keys.edx.locations import SlashSeparatedCourseKey
 from xblock.field_data import DictFieldData
 from xblock.fields import ScopeIds
@@ -92,14 +90,17 @@ def instantiate_descriptor(**field_data):
     )
 
 
-def _reset_val_data():
-    """
-    Remove all data from VAL
+# Because of the way xmodule.video_module.video_module imports edxval.api, we
+# must mock the entire module, which requires making mock exception classes.
 
-    This is a necessary cleanup step because these are not django TestCases
-    """
-    edxval_models.Video.objects.all().delete()
-    edxval_models.Profile.objects.all().delete()
+class _MockValVideoNotFoundError(Exception):
+    """Mock ValVideoNotFoundError exception"""
+    pass
+
+
+class _MockValCannotCreateError(Exception):
+    """Mock ValCannotCreateError exception"""
+    pass
 
 
 class VideoModuleTest(LogicTest):
@@ -535,14 +536,15 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
             'data': ''
         })
 
-    def test_import_val_data(self):
+    @patch('xmodule.video_module.video_module.edxval_api')
+    def test_import_val_data(self, mock_val_api):
         # setup
         module_system = DummySystem(load_error_modules=True)
-        for profile in ['mobile_low', 'mobile_high']:
-            create_profile(profile)
-        self.addCleanup(_reset_val_data)
         id_generator = Mock()
         id_generator.course_id = 'test_course_id'
+        mock_val_api.ValVideoNotFoundError = _MockValVideoNotFoundError
+        mock_val_api.get_video_info = Mock(side_effect=mock_val_api.ValVideoNotFoundError)
+        mock_val_api.create_video = Mock()
 
         # import new edx_video_id
         xml_data = """
@@ -557,47 +559,45 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
         video.save()
 
         self.assert_attributes_equal(video, {'edx_video_id': 'test_edx_video_id'})
-        val_video_info = get_video_info('test_edx_video_id')
-        self.assertEqual(val_video_info['edx_video_id'], 'test_edx_video_id')
-        self.assertEqual(val_video_info['client_video_id'], 'test_client_video_id')
-        self.assertEqual(val_video_info['duration'], 128.0)
-        self.assertEqual(val_video_info['status'], 'imported')
-        self.assertEqual(len(val_video_info['encoded_videos']), 2)
-        val_video_info['encoded_videos'].sort(
-            key=(lambda encoded_video: encoded_video['url'])
-        )
-        self.assertEqual(val_video_info['encoded_videos'][0]['url'], 'profile1_url')
-        self.assertEqual(val_video_info['encoded_videos'][0]['file_size'], 1600)
-        self.assertEqual(val_video_info['encoded_videos'][0]['bitrate'], 100)
-        self.assertEqual(val_video_info['encoded_videos'][0]['profile'], 'mobile_low')
-        self.assertEqual(val_video_info['encoded_videos'][1]['url'], 'profile2_url')
-        self.assertEqual(val_video_info['encoded_videos'][1]['file_size'], 16000)
-        self.assertEqual(val_video_info['encoded_videos'][1]['bitrate'], 1000)
-        self.assertEqual(val_video_info['encoded_videos'][1]['profile'], 'mobile_high')
+        mock_val_api.get_video_info.assert_called_once_with('test_edx_video_id')
+        mock_val_api.create_video.assert_called_once_with({
+            'edx_video_id': 'test_edx_video_id',
+            'client_video_id': 'test_client_video_id',
+            'duration': '128.0',
+            'status': 'imported',
+            'encoded_videos': [
+                {
+                    'url': 'profile1_url',
+                    'file_size': 1600,
+                    'bitrate': 100,
+                    'profile': 'mobile_low',
+                },
+                {
+                    'url': 'profile2_url',
+                    'file_size': 16000,
+                    'bitrate': 1000,
+                    'profile': 'mobile_high',
+                },
+            ],
+            'courses': ['test_course_id'],
+        })
 
-    def test_import_val_data_conflict(self):
+    @patch('xmodule.video_module.video_module.edxval_api')
+    def test_import_val_data_conflict(self, mock_val_api):
         module_system = DummySystem(load_error_modules=True)
         id_generator = Mock()
         id_generator.course_id = 'test_course_id'
-        for profile in ['original_profile', 'new_profile']:
-            create_profile(profile)
-        create_video(
-            {
+        mock_val_api.get_video_info = Mock(
+            return_value={
                 'edx_video_id': 'test_edx_video_id',
-                'client_video_id': 'original_client_video_id',
+                'client_video_id': 'test_client_video_id',
                 'duration': 1111,
-                'status': 'original_status',
-                'encoded_videos': [
-                    {
-                        'profile': 'original_profile',
-                        'url': 'original_url',
-                        'file_size': 2222,
-                        'bitrate': 3333,
-                    },
-                ],
-            },
+                'test_status': 'original_status',
+                'encoded_videos': [],
+                'courses': [],
+            }
         )
-        self.addCleanup(_reset_val_data)
+        mock_val_api.create_video = Mock()
 
         xml_data = """
             <video edx_video_id="test_edx_video_id">
@@ -609,22 +609,18 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
         video = VideoDescriptor.from_xml(xml_data, module_system, id_generator)
         video.save()
 
-        val_video_info = get_video_info('test_edx_video_id')
-        self.assertEqual(val_video_info['client_video_id'], 'original_client_video_id')
-        self.assertEqual(val_video_info['duration'], 1111)
-        self.assertEqual(val_video_info['status'], 'original_status')
-        self.assertEqual(len(val_video_info['encoded_videos']), 1)
-        self.assertEqual(val_video_info['encoded_videos'][0]['url'], 'original_url')
-        self.assertEqual(val_video_info['encoded_videos'][0]['file_size'], 2222)
-        self.assertEqual(val_video_info['encoded_videos'][0]['bitrate'], 3333)
-        self.assertEqual(val_video_info['encoded_videos'][0]['profile'], 'original_profile')
+        mock_val_api.get_video_info.assert_called_once_with('test_edx_video_id')
+        self.assertFalse(mock_val_api.create_video.called)
 
-    def test_import_val_data_invalid(self):
+    @patch('xmodule.video_module.video_module.edxval_api')
+    def test_import_val_data_invalid(self, mock_val_api):
         module_system = DummySystem(load_error_modules=True)
         id_generator = Mock()
         id_generator.course_id = 'test_course_id'
-        create_profile('test_profile')
-        self.addCleanup(_reset_val_data)
+        mock_val_api.ValVideoNotFoundError = _MockValVideoNotFoundError
+        mock_val_api.ValCannotCreateError = _MockValCannotCreateError
+        mock_val_api.get_video_info = Mock(side_effect=mock_val_api.ValVideoNotFoundError)
+        mock_val_api.create_video = Mock(side_effect=mock_val_api.ValCannotCreateError)
 
         xml_data = """
             <video edx_video_id="test_edx_video_id">
@@ -632,7 +628,7 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
             </video>
         """
         video = VideoDescriptor.from_xml(xml_data, module_system, id_generator)
-        with self.assertRaises(ValCannotCreateError):
+        with self.assertRaises(mock_val_api.ValCannotCreateError):
             video.save()
 
 
@@ -641,12 +637,22 @@ class VideoExportTestCase(VideoDescriptorTestBase):
     Make sure that VideoDescriptor can export itself to XML correctly.
     """
     def assertXmlEqual(self, expected, xml):
+        """
+        Assert that the given XML fragments have the same attributes, text, and
+        (recursively) children
+        """
+        def get_child_names(elem):
+            """Extract the list of tag names for children of elem"""
+            return [child.tag for child in elem]
+
         for attr in ['tag', 'attrib', 'text', 'tail']:
             self.assertEqual(getattr(expected, attr), getattr(xml, attr))
+        self.assertEqual(get_child_names(expected), get_child_names(xml))
         for left, right in zip(expected, xml):
             self.assertXmlEqual(left, right)
 
-    def test_export_to_xml(self):
+    @patch('xmodule.video_module.video_module.edxval_api')
+    def test_export_to_xml(self, mock_val_api):
         """
         Test that we write the correct XML on export.
         """
@@ -663,31 +669,28 @@ class VideoExportTestCase(VideoDescriptorTestBase):
         self.descriptor.html5_sources = ['http://www.example.com/source.mp4', 'http://www.example.com/source.ogg']
         self.descriptor.download_video = True
         self.descriptor.transcripts = {'ua': 'ukrainian_translation.srt', 'ge': 'german_translation.srt'}
-        for profile in ["mobile_low", "mobile_high"]:
-            create_profile(profile)
-        self.descriptor.edx_video_id = create_video(
-            {
-                "edx_video_id": "test_edx_video_id",
-                "client_video_id": "test_client_video_id",
-                "duration": 128.0,
-                "status": "dummy_status",
-                "encoded_videos": [
+        self.descriptor.edx_video_id = 'test_edx_video_id'
+        mock_val_api.get_video_info = Mock(
+            return_value={
+                'edx_video_id': 'test_edx_video_id',
+                'client_video_id': 'test_client_video_id',
+                'duration': 128.0,
+                'encoded_videos': [
                     {
-                        "profile": "mobile_low",
-                        "url": "profile1_url",
-                        "file_size": 1600,
-                        "bitrate": 100,
+                        'profile': 'mobile_low',
+                        'url': 'profile1_url',
+                        'file_size': 1600,
+                        'bitrate': 100,
                     },
                     {
-                        "profile": "mobile_high",
-                        "url": "profile2_url",
-                        "file_size": 16000,
-                        "bitrate": 1000,
+                        'profile': 'mobile_high',
+                        'url': 'profile2_url',
+                        'file_size': 16000,
+                        'bitrate': 1000,
                     },
                 ],
-            },
+            }
         )
-        self.addCleanup(_reset_val_data)
 
         xml = self.descriptor.definition_to_xml(None)  # We don't use the `resource_fs` parameter
         parser = etree.XMLParser(remove_blank_text=True)
@@ -707,8 +710,6 @@ class VideoExportTestCase(VideoDescriptorTestBase):
         '''
         expected = etree.XML(xml_string, parser=parser)
         self.assertXmlEqual(expected, xml)
-
-        _reset_val_data()
 
     def test_export_to_xml_empty_end_time(self):
         """

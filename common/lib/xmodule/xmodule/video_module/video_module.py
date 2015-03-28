@@ -504,7 +504,7 @@ class VideoDescriptor(VideoFields, VideoTranscriptsMixin, VideoStudioViewHandler
         if self.edx_video_id and edxval_api:
             try:
                 val_info = edxval_api.get_video_info(self.edx_video_id)
-                ele = etree.Element(
+                ele = etree.Element(  # pylint: disable=no-member
                     'video_asset_data',
                     attrib={
                         'client_video_id': val_info['client_video_id'],
@@ -512,7 +512,7 @@ class VideoDescriptor(VideoFields, VideoTranscriptsMixin, VideoStudioViewHandler
                     }
                 )
                 for encoded_video in val_info['encoded_videos']:
-                    etree.SubElement(
+                    etree.SubElement(  # pylint: disable=no-member
                         ele,
                         'encoded_video',
                         attrib={
